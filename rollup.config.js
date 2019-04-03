@@ -28,7 +28,7 @@ export default {
     resolve(),
   ],
   output: {
-    file: 'build/js/sim2d.bundle.js',
+    file: 'build/sim2d.bundle.js',
     //sourcemap: 'inline',
     format: 'esm',
     name: 'sim2d'
