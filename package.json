@@ -2,14 +2,14 @@
   "name": "sim2d",
   "version": "0.0.1",
   "description": "Extends a WebGL context to include some convenient methods of a 2D canvas",
-  "main": "build/sim2d.bundle.js",
+  "main": "dist/sim2d.bundle.js",
   "files": [
-    "build"
+    "dist"
   ],
   "directories": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rollup -c"
+    "build": "rollup -c build/rollup.config.js"
   },
   "repository": {
     "type": "git",
