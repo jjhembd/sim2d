@@ -405,7 +405,8 @@ const quadShaders = {
   frag: fragmentSrc,
 };
 
-function initSim2d(gl, testImage) {
+function initSim2d(gl) {
+  // NOTE: ASSUMES canvas drawingbuffer has already been resized as needed
   const canvas = gl.canvas;
 
   // Initialize shader program
@@ -413,7 +414,7 @@ function initSim2d(gl, testImage) {
 
   // Load data into GPU for shaders: attribute buffers, indices, texture
   const buffers = initQuadBuffers(gl);
-  const texture = initTexture(gl, testImage);
+  const texture = initTexture(gl, canvas);
 
   // Store links to uniforms
   const uniforms = {
@@ -460,24 +461,33 @@ function initSim2d(gl, testImage) {
       sHeight = image.height;
     }
 
-    // Set uniforms
-    uSourceOrigin[0] = sx / image.width;
-    uSourceOrigin[1] = sy / image.height;
-    uSourceScale[0] = sWidth / image.width;
-    uSourceScale[1] = sHeight / image.height;
+    // Set uniforms  TODO: too verbose?
+    // Source origin/scale: which part of the image to read
+    // Image coordinates are from 0 to 1, top left to bottom right
+    uniforms.uSourceOrigin[0] = sx / image.width;
+    uniforms.uSourceOrigin[1] = sy / image.height;
+    uniforms.uSourceScale[0] = sWidth / image.width;
+    uniforms.uSourceScale[1] = sHeight / image.height;
 
-    uDestOrigin[0] = dx / canvas.width;
-    uDestOrigin[1] = dy / canvas.height;
-    uDestScale[0] = image.width / canvas.width;
-    uDestScale[1] = image.width / canvas.height;
-
-    // Load image into texture
-    texture.replace( image );  // TODO: this uses mipmaps--inefficient?
+    // Destination origin/scale: where on the canvas to write
+    // WebGL canvas coordinates are from -1 to +1, bottom left to top right
+    // We can think of the "origin" as the shift of the CENTER of the quad
+    // relative to the CENTER of the canvas
+    var xscale = dWidth / canvas.width;
+    var yscale = dHeight / canvas.height;
+    uniforms.uDestOrigin[0] = -1.0 + 2.0 * dx / canvas.width + xscale;
+    uniforms.uDestOrigin[1] =  1.0 - 2.0 * dy / canvas.height - yscale;
+    uniforms.uDestScale[0] = xscale;
+    uniforms.uDestScale[1] = yscale;
 
     // Clear the area we're about to draw 
     // (we are working in 2D with no z-info, so this is the only way to make
     //  sure we aren't drawing behind something else)
-    clearRect$1(dx, dy, dWidth, dHeight);
+    // TODO: Just disable depth test?
+    //clearRect(dx, dy, dWidth, dHeight);
+
+    // Load image into texture
+    texture.replace( image );  // TODO: this uses mipmaps--inefficient?
 
     // Draw the image
     drawOver( gl, progInfo, buffers, uniforms );
@@ -486,8 +496,9 @@ function initSim2d(gl, testImage) {
   }
 
   function clearRect$1(x, y, width, height) {
-    // Use the scissor test flow from yawgl. Just need to add the context
-    clearRect(gl, x, y, width, height);
+    // Flip the y-axis to be consistent with WebGL coordinates
+    var yflip = canvas.height - y - height;
+    clearRect(gl, x, yflip, width, height);
 
     return;
   }
