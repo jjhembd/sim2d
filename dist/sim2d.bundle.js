@@ -289,7 +289,7 @@ function initQuadBuffers(gl) {
   };
 }
 
-function initTexture(gl, data) {
+function initTexture(gl, width, height) { // data) {
   // Initializes a 2D texture object, extending the default gl.createTexture()
   // The GL context and the binding target are implicitly saved in the closure.
   // Returns the sampler (as a property) along with update and replace methods.
@@ -304,11 +304,15 @@ function initTexture(gl, data) {
   const internalFormat = gl.RGBA;
   const srcFormat = gl.RGBA;
   const srcType = gl.UNSIGNED_BYTE;
+  const border = 0;
 
-  gl.texImage2D(target, level, internalFormat, srcFormat, srcType, data);
+  //gl.texImage2D(target, level, internalFormat, srcFormat, srcType, data);
+  gl.texImage2D(target, level, internalFormat, width, height, border,
+      srcFormat, srcType, null);
 
   // Set up mipmapping and anisotropic filtering, if appropriate
-  setupMipMaps(gl, target, data.width, data.height);
+  //setupMipMaps(gl, target, data.width, data.height);
+  setupMipMaps(gl, target, width, height);
   setTextureAnisotropy(gl, target);
 
   return {
@@ -414,7 +418,7 @@ function initSim2d(gl) {
 
   // Load data into GPU for shaders: attribute buffers, indices, texture
   const buffers = initQuadBuffers(gl);
-  const texture = initTexture(gl, canvas);
+  const texture = initTexture(gl, canvas.width, canvas.height);
 
   // Store links to uniforms
   const uniforms = {

@@ -12,7 +12,7 @@ export function initSim2d(gl) {
 
   // Load data into GPU for shaders: attribute buffers, indices, texture
   const buffers = yawgl.initQuadBuffers(gl);
-  const texture = yawgl.initTexture(gl, canvas);
+  const texture = yawgl.initTexture(gl, canvas.width, canvas.height);
 
   // Store links to uniforms
   const uniforms = {
