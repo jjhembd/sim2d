@@ -208,9 +208,7 @@ function loadShader(gl, type, source) {
 
 function drawOver( gl, programInfo, buffers, uniforms ) {
   // Overwrite whatever is on the canvas, without clearing anything
-
-  // Tell WebGL how to convert from clip space to pixels
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  // BEWARE: make sure viewport is already set appropriately
 
   // Set up program, attributes, and uniforms
   gl.useProgram(programInfo.program);
@@ -289,7 +287,7 @@ function initQuadBuffers(gl) {
   };
 }
 
-function initTexture(gl, width, height) { // data) {
+function initTexture(gl, width, height) {
   // Initializes a 2D texture object, extending the default gl.createTexture()
   // The GL context and the binding target are implicitly saved in the closure.
   // Returns the sampler (as a property) along with update and replace methods.
@@ -306,12 +304,10 @@ function initTexture(gl, width, height) { // data) {
   const srcType = gl.UNSIGNED_BYTE;
   const border = 0;
 
-  //gl.texImage2D(target, level, internalFormat, srcFormat, srcType, data);
   gl.texImage2D(target, level, internalFormat, width, height, border,
       srcFormat, srcType, null);
 
   // Set up mipmapping and anisotropic filtering, if appropriate
-  //setupMipMaps(gl, target, data.width, data.height);
   setupMipMaps(gl, target, width, height);
   setTextureAnisotropy(gl, target);
 
@@ -409,22 +405,39 @@ const quadShaders = {
   frag: fragmentSrc,
 };
 
-function initSim2d(gl, fb) {
+function initSim2d(gl, fb, fbWidth, fbHeight) {
+  // Store link to the framebuffer
   var haveFB = (fb instanceof WebGLFramebuffer);
   if (!haveFB) console.log("initSim2d WARNING: no framebuffer supplied!");
   const framebuffer = (haveFB)
     ? fb
-    : null;
+    : null;  // Default to the canvas framebuffer of the supplied context
 
-  // NOTE: ASSUMES canvas drawingbuffer has already been resized as needed
-  // TODO: what if framebuffer is a different size than the gl.canvas?
-  const canvas = gl.canvas;
+  // Store width and height of framebuffer in an updateable canvas property
+  var canvas;
+  if (!haveFB) {
+    // No framebuffer. Use existing context canvas property
+    canvas = gl.canvas;
+  } else if (fbWidth && fbHeight) {
+    // Use supplied values
+    canvas = {
+      width: fbWidth,
+      height: fbHeight,
+    };
+  } else {
+    // Use size of context canvas for now
+    canvas = {
+      width: gl.canvas.width,
+      height: gl.canvas.height,
+    };
+  }
 
   // Initialize shader program
   const progInfo = initShaderProgram(gl, quadShaders.vert, quadShaders.frag);
 
-  // Load data into GPU for shaders: attribute buffers, indices, texture
+  // Load data into GPU for shaders: attribute buffers, indices
   const buffers = initQuadBuffers(gl);
+  // Initialize texture for rendering images to framebuffer. Size is arbitrary?
   const texture = initTexture(gl, canvas.width, canvas.height);
 
   // Store links to uniforms
@@ -472,15 +485,14 @@ function initSim2d(gl, fb) {
       sHeight = image.height;
     }
 
-    // Set uniforms  TODO: too verbose?
-    // Source origin/scale: which part of the image to read
+    // Set source origin/scale: which part of the image to read
     // Image coordinates are from 0 to 1, top left to bottom right
     uniforms.uSourceOrigin[0] = sx / image.width;
     uniforms.uSourceOrigin[1] = sy / image.height;
     uniforms.uSourceScale[0] = sWidth / image.width;
     uniforms.uSourceScale[1] = sHeight / image.height;
 
-    // Destination origin/scale: where on the canvas to write
+    // Set destination origin/scale: where on the canvas to write
     // WebGL canvas coordinates are from -1 to +1, bottom left to top right
     // We can think of the "origin" as the shift of the CENTER of the quad
     // relative to the CENTER of the canvas
@@ -492,19 +504,26 @@ function initSim2d(gl, fb) {
     uniforms.uDestScale[1] = yscale;
 
     // Clear the area we're about to draw 
-    // (we are working in 2D with no z-info, so this is the only way to make
-    //  sure we aren't drawing behind something else)
-    // TODO: Just disable depth test?
+    // TODO: Not necessary with no depth test? What about transparency?
     //clearRect(dx, dy, dWidth, dHeight);
 
+    draw(image);
+
+    return;
+  }
+
+  function draw(image) {
     // Load image into texture
     texture.replace( image );  // TODO: this uses mipmaps--inefficient?
 
-    // Draw the image
+    // Make sure we are going to the correct framebuffer
     if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    // TODO: do we need to attach the texture to the framebuffer?
-    // TODO: drawOver sets viewPort to canvas size...
+
+    // Set viewport. NOTE: no scissor test!
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
     drawOver( gl, progInfo, buffers, uniforms );
+
     // Unbind framebuffer, so later calls will go to the canvas
     if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
@@ -514,7 +533,11 @@ function initSim2d(gl, fb) {
   function clearRect$1(x, y, width, height) {
     // Flip the y-axis to be consistent with WebGL coordinates
     var yflip = canvas.height - y - height;
+
+    // Make sure we are working with the right framebuffer
+    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     clearRect(gl, x, yflip, width, height);
+    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return;
   }
