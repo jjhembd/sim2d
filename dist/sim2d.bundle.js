@@ -313,23 +313,8 @@ function initTexture(gl, width, height) {
 
   return {
     sampler: texture,
-    updatePartial,
     replace,
     update,
-  }
-
-  function updatePartial( image ) {
-    // Updates a portion of the texture with the supplied image data.
-    gl.bindTexture(target, texture);
-    
-    // Image will be written starting from the pixel (xoffset, yoffset).
-    // If these values are not set on the input, use (0,0)
-    var xoff = image.xoffset || 0;
-    var yoff = image.yoffset || 0;
-    gl.texSubImage2D(target, level, xoff, yoff, srcFormat, srcType, image);
-
-    // TODO: don't we need to update the mipmaps??
-    return;
   }
 
   function replace( image ) {
@@ -344,10 +329,14 @@ function initTexture(gl, width, height) {
   }
 
   function update( image ) {
-    // Re-fills the texture with the supplied image data,
-    // ASSUMING the image and texture are the same size
+    // Updates a portion of the texture with the supplied image data.
     gl.bindTexture(target, texture);
-    gl.texSubImage2D(target, level, 0, 0, srcFormat, srcType, image);
+
+    // Image will be written starting from the pixel (xoffset, yoffset).
+    // If these values are not set on the input, use (0,0)
+    var xoff = image.xoffset || 0;
+    var yoff = image.yoffset || 0;
+    gl.texSubImage2D(target, level, xoff, yoff, srcFormat, srcType, image);
 
     setupMipMaps(gl, target, image.width, image.height);
     return;
@@ -405,32 +394,9 @@ const quadShaders = {
   frag: fragmentSrc,
 };
 
-function initSim2d(gl, fb, fbWidth, fbHeight) {
-  // Store link to the framebuffer
-  var haveFB = (fb instanceof WebGLFramebuffer);
-  if (!haveFB) console.log("initSim2d WARNING: no framebuffer supplied!");
-  const framebuffer = (haveFB)
-    ? fb
-    : null;  // Default to the canvas framebuffer of the supplied context
-
-  // Store width and height of framebuffer in an updateable canvas property
-  var canvas;
-  if (!haveFB) {
-    // No framebuffer. Use existing context canvas property
-    canvas = gl.canvas;
-  } else if (fbWidth && fbHeight) {
-    // Use supplied values
-    canvas = {
-      width: fbWidth,
-      height: fbHeight,
-    };
-  } else {
-    // Use size of context canvas for now
-    canvas = {
-      width: gl.canvas.width,
-      height: gl.canvas.height,
-    };
-  }
+function initRenderer(gl, fbSize) {
+  // Input gl is a WebGL rendering context
+  // Input fbSize is an object with properties width, height
 
   // Initialize shader program
   const progInfo = initShaderProgram(gl, quadShaders.vert, quadShaders.frag);
@@ -438,7 +404,7 @@ function initSim2d(gl, fb, fbWidth, fbHeight) {
   // Load data into GPU for shaders: attribute buffers, indices
   const buffers = initQuadBuffers(gl);
   // Initialize texture for rendering images to framebuffer. Size is arbitrary?
-  const texture = initTexture(gl, canvas.width, canvas.height);
+  const texture = initTexture(gl, fbSize.width, fbSize.height);
 
   // Store links to uniforms
   const uniforms = {
@@ -450,7 +416,6 @@ function initSim2d(gl, fb, fbWidth, fbHeight) {
   };
 
   return {
-    canvas,
     drawImage,
     clearRect: clearRect$1,
   };
@@ -496,10 +461,10 @@ function initSim2d(gl, fb, fbWidth, fbHeight) {
     // WebGL canvas coordinates are from -1 to +1, bottom left to top right
     // We can think of the "origin" as the shift of the CENTER of the quad
     // relative to the CENTER of the canvas
-    var xscale = dWidth / canvas.width;
-    var yscale = dHeight / canvas.height;
-    uniforms.uDestOrigin[0] = -1.0 + 2.0 * dx / canvas.width + xscale;
-    uniforms.uDestOrigin[1] =  1.0 - 2.0 * dy / canvas.height - yscale;
+    var xscale = dWidth / fbSize.width;
+    var yscale = dHeight / fbSize.height;
+    uniforms.uDestOrigin[0] = -1.0 + 2.0 * dx / fbSize.width + xscale;
+    uniforms.uDestOrigin[1] =  1.0 - 2.0 * dy / fbSize.height - yscale;
     uniforms.uDestScale[0] = xscale;
     uniforms.uDestScale[1] = yscale;
 
@@ -508,7 +473,6 @@ function initSim2d(gl, fb, fbWidth, fbHeight) {
     //clearRect(dx, dy, dWidth, dHeight);
 
     draw(image);
-
     return;
   }
 
@@ -516,27 +480,79 @@ function initSim2d(gl, fb, fbWidth, fbHeight) {
     // Load image into texture
     texture.replace( image );  // TODO: this uses mipmaps--inefficient?
 
-    // Make sure we are going to the correct framebuffer
-    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-
     // Set viewport. NOTE: no scissor test!
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.viewport(0, 0, fbSize.width, fbSize.height);
 
     drawOver( gl, progInfo, buffers, uniforms );
-
-    // Unbind framebuffer, so later calls will go to the canvas
-    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
     return;
   }
 
   function clearRect$1(x, y, width, height) {
     // Flip the y-axis to be consistent with WebGL coordinates
-    var yflip = canvas.height - y - height;
+    var yflip = fbSize.height - y - height;
 
-    // Make sure we are working with the right framebuffer
-    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     clearRect(gl, x, yflip, width, height);
+    return;
+  }
+}
+
+function initSim2d(gl, fb, fbWidth, fbHeight) {
+  // Store link to the framebuffer
+  var haveFB = (fb instanceof WebGLFramebuffer);
+  if (!haveFB) console.log("initSim2d WARNING: no framebuffer supplied!");
+  const framebuffer = (haveFB)
+    ? fb
+    : null;  // Default to the canvas framebuffer of the supplied context
+
+  // Store width and height of framebuffer in an updateable canvas property
+  var canvas;
+  if (!haveFB) {
+    // No framebuffer. Use existing context canvas property
+    canvas = gl.canvas;
+  } else if (fbWidth && fbHeight) {
+    // Use supplied values
+    canvas = {
+      width: fbWidth,
+      height: fbHeight,
+    };
+  } else {
+    // Use size of context canvas for now
+    canvas = {
+      width: gl.canvas.width,
+      height: gl.canvas.height,
+    };
+  }
+
+  // Initialize renderer (returns methods drawImage, clearRect)
+  const render = initRenderer(gl, canvas);
+
+  return {
+    canvas,
+    drawImage,
+    clearRect,
+  };
+
+  function drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight) {
+    // If we are rendering to a framebuffer, bind it first
+    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+    // Pass on the call.  TODO: this is messy
+    render.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+
+    // Rebind the default canvas buffer
+    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    return;
+  }
+
+  function clearRect(x, y, width, height) {
+    // If we are rendering to a framebuffer, bind it first
+    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+    // Pass on the call to the renderer. TODO: this is messy
+    render.clearRect(x, y, width, height);
+
+    // Rebind the default canvas buffer
     if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return;
