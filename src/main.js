@@ -3,8 +3,15 @@
 import * as yawgl from 'yawgl';
 import { quadShaders as shaderSrc } from "./shaders/quadShaders.js";
 
-export function initSim2d(gl) {
+export function initSim2d(gl, fb) {
+  var haveFB = (fb instanceof WebGLFramebuffer);
+  if (!haveFB) console.log("initSim2d WARNING: no framebuffer supplied!");
+  const framebuffer = (haveFB)
+    ? fb
+    : null;
+
   // NOTE: ASSUMES canvas drawingbuffer has already been resized as needed
+  // TODO: what if framebuffer is a different size than the gl.canvas?
   const canvas = gl.canvas;
 
   // Initialize shader program
@@ -88,7 +95,12 @@ export function initSim2d(gl) {
     texture.replace( image );  // TODO: this uses mipmaps--inefficient?
 
     // Draw the image
+    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    // TODO: do we need to attach the texture to the framebuffer?
+    // TODO: drawOver sets viewPort to canvas size...
     yawgl.drawOver( gl, progInfo, buffers, uniforms );
+    // Unbind framebuffer, so later calls will go to the canvas
+    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return;
   }
