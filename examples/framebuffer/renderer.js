@@ -12,24 +12,17 @@ export function initRenderer(canvas) {
   // Initialize shader program
   const progInfo = yawgl.initShaderProgram(gl, shaderSrc.vert, shaderSrc.frag);
 
-  // Load data into GPU for shaders: attribute buffers, indices, texture
+  // Load data into GPU for shaders: attribute buffers, indices
   const buffers = yawgl.initQuadBuffers(gl);
-  const texture = yawgl.initTexture(gl, gl.canvas.width, gl.canvas.height);
+
+  // Create simulated 2D canvas as wrapper on a WebGL framebuffer
+  const ctx2d = sim2d.canvas2dWrappingFramebuffer(gl, 
+      gl.canvas.width, gl.canvas.height);
 
   // Store links to uniforms
   const uniforms = {
-    uTextureSampler: texture.sampler,
+    uTextureSampler: ctx2d.renderedTexture,
   };
-
-  // Create simulated 2D canvas as wrapper on a WebGL framebuffer
-  const fb = gl.createFramebuffer();
-  // Attach the texture
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-  const level = 0;
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-      gl.TEXTURE_2D, texture.sampler, level);
-
-  const ctx2d = sim2d.canvas2dWrappingFramebuffer(gl, fb);
 
   // Return simulated 2D context for use as a render target
   // Also return draw method to render the texture to the canvas

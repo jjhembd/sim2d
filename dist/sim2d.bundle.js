@@ -509,26 +509,31 @@ function canvas2dFromWebgl(gl) {
   };
 }
 
-function canvas2dWrappingFramebuffer(gl, framebuffer, fbWidth, fbHeight) {
-  // Make sure we have a valid framebuffer
-  if ( !(framebuffer instanceof WebGLFramebuffer) ) {
-    console.log("sim2d ERROR: no valid framebuffer supplied!");
-    return false;
-  }
+function canvas2dWrappingFramebuffer(gl, fbWidth, fbHeight) {
+  // Initialize a texture
+  const texture = initTexture(gl, fbWidth, fbHeight);
+
+  // Create a framebuffer, and attach the texture to it
+  const framebuffer = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+  const level = 0;
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D, texture.sampler, level);
 
   // Store width and height of framebuffer in an updateable canvas property
   const fbSize = {
-    width: fbWidth || gl.canvas.width,
-    height: fbHeight || gl.canvas.height,
+    width: fbWidth,
+    height: fbHeight,
   };
 
   // Initialize renderer (returns methods drawImage, clearRect)
-  const render = initRenderer(gl, fbSize);
+  const renderer = initRenderer(gl, fbSize);
 
   return {
     canvas: fbSize,
     drawImage,
     clearRect,
+    renderedTexture: texture.sampler,
   };
 
   // Wrap render functions with framebuffer bindings
@@ -536,7 +541,7 @@ function canvas2dWrappingFramebuffer(gl, framebuffer, fbWidth, fbHeight) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
     // TODO: duplicated parameter list is messy
-    render.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+    renderer.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return;
@@ -546,7 +551,7 @@ function canvas2dWrappingFramebuffer(gl, framebuffer, fbWidth, fbHeight) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
     // TODO: duplicated parameter list is messy
-    render.clearRect(x, y, width, height);
+    renderer.clearRect(x, y, width, height);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return;
