@@ -5,7 +5,8 @@ import { initRenderer } from "./renderer.js";
 
 export function canvas2dFromWebgl(gl) {
   // Input gl is a WebGLRenderingContext
-  const renderer = initRenderer(gl, gl.canvas);
+  const texFlip = 1; // Render dy = 0 at normalized device coordinate +1
+  const renderer = initRenderer(gl, gl.canvas, texFlip);
 
   // Return methods emulating some of the behavior of CanvasRenderingContext2D
   return {
@@ -33,7 +34,8 @@ export function canvas2dWrappingFramebuffer(gl, fbWidth, fbHeight) {
   };
 
   // Initialize renderer (returns methods drawImage, clearRect)
-  const renderer = initRenderer(gl, fbSize);
+  const texFlip = -1; // Render dy = 0 at normalized device coordinate -1
+  const renderer = initRenderer(gl, fbSize, texFlip);
 
   return {
     canvas: fbSize,

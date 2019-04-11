@@ -394,10 +394,16 @@ const quadShaders = {
   frag: fragmentSrc,
 };
 
-function initRenderer(gl, fbSize) {
+function initRenderer(gl, fbSize, texFlip) {
   // Input gl is a WebGL rendering context
   // Input fbSize is an object with properties width, height indicating the
   //   pixel size of the framebuffer to which we are rendering
+  // Input texFlip indicates the y-orientation of the output:
+  //  texFlip = +1: renders dy = 0 at normalized device coordinate y = +1, 
+  //                matching canvas2d display
+  //  texFlip = -1: renders dy = 0 at normalized device coordinate y = -1.
+  //                This puts the image 'upside-down' in the texture, but now
+  //                it will read like an HTML element copied into a texture
 
   // Initialize shader program
   const progInfo = initShaderProgram(gl, quadShaders.vert, quadShaders.frag);
@@ -453,21 +459,27 @@ function initRenderer(gl, fbSize) {
 
     // Set source origin/scale: which part of the image to read
     // Image coordinates are from 0 to 1, top left to bottom right
-    uniforms.uSourceOrigin[0] = sx / image.width;
-    uniforms.uSourceOrigin[1] = sy / image.height;
-    uniforms.uSourceScale[0] = sWidth / image.width;
-    uniforms.uSourceScale[1] = sHeight / image.height;
+    uniforms.uSourceScale.set([ 
+        sWidth  / image.width, 
+        sHeight / image.height 
+    ]);
+    uniforms.uSourceOrigin.set([ 
+        sx / image.width, 
+        sy / image.height 
+    ]);
 
     // Set destination origin/scale: where on the canvas to write
     // WebGL canvas coordinates are from -1 to +1, bottom left to top right
     // We can think of the "origin" as the shift of the CENTER of the quad
     // relative to the CENTER of the canvas
-    var xscale = dWidth / fbSize.width;
-    var yscale = dHeight / fbSize.height;
-    uniforms.uDestOrigin[0] = -1.0 + 2.0 * dx / fbSize.width + xscale;
-    uniforms.uDestOrigin[1] =  1.0 - 2.0 * dy / fbSize.height - yscale;
-    uniforms.uDestScale[0] = xscale;
-    uniforms.uDestScale[1] = yscale;
+    uniforms.uDestScale.set([ 
+        dWidth  / fbSize.width, 
+        dHeight / fbSize.height * texFlip 
+    ]);
+    uniforms.uDestOrigin.set([
+       -1.0 + (2.0 * dx + dWidth ) / fbSize.width,
+       (1.0 - (2.0 * dy + dHeight) / fbSize.height) * texFlip
+    ]);
 
     // Clear the area we're about to draw 
     // TODO: Not necessary with no depth test? What about transparency?
@@ -499,7 +511,8 @@ function initRenderer(gl, fbSize) {
 
 function canvas2dFromWebgl(gl) {
   // Input gl is a WebGLRenderingContext
-  const renderer = initRenderer(gl, gl.canvas);
+  const texFlip = 1; // Render dy = 0 at normalized device coordinate +1
+  const renderer = initRenderer(gl, gl.canvas, texFlip);
 
   // Return methods emulating some of the behavior of CanvasRenderingContext2D
   return {
@@ -527,7 +540,8 @@ function canvas2dWrappingFramebuffer(gl, fbWidth, fbHeight) {
   };
 
   // Initialize renderer (returns methods drawImage, clearRect)
-  const renderer = initRenderer(gl, fbSize);
+  const texFlip = -1; // Render dy = 0 at normalized device coordinate -1
+  const renderer = initRenderer(gl, fbSize, texFlip);
 
   return {
     canvas: fbSize,
