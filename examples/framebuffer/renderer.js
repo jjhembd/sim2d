@@ -29,7 +29,7 @@ export function initRenderer(canvas) {
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
       gl.TEXTURE_2D, texture.sampler, level);
 
-  const ctx2d = sim2d.initSim2d(gl, fb);
+  const ctx2d = sim2d.canvas2dWrappingFramebuffer(gl, fb);
 
   // Return simulated 2D context for use as a render target
   // Also return draw method to render the texture to the canvas

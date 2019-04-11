@@ -396,7 +396,8 @@ const quadShaders = {
 
 function initRenderer(gl, fbSize) {
   // Input gl is a WebGL rendering context
-  // Input fbSize is an object with properties width, height
+  // Input fbSize is an object with properties width, height indicating the
+  //   pixel size of the framebuffer to which we are rendering
 
   // Initialize shader program
   const progInfo = initShaderProgram(gl, quadShaders.vert, quadShaders.frag);
@@ -496,67 +497,60 @@ function initRenderer(gl, fbSize) {
   }
 }
 
-function initSim2d(gl, fb, fbWidth, fbHeight) {
-  // Store link to the framebuffer
-  var haveFB = (fb instanceof WebGLFramebuffer);
-  if (!haveFB) console.log("initSim2d WARNING: no framebuffer supplied!");
-  const framebuffer = (haveFB)
-    ? fb
-    : null;  // Default to the canvas framebuffer of the supplied context
+function canvas2dFromWebgl(gl) {
+  // Input gl is a WebGLRenderingContext
+  const renderer = initRenderer(gl, gl.canvas);
 
-  // Store width and height of framebuffer in an updateable canvas property
-  var canvas;
-  if (!haveFB) {
-    // No framebuffer. Use existing context canvas property
-    canvas = gl.canvas;
-  } else if (fbWidth && fbHeight) {
-    // Use supplied values
-    canvas = {
-      width: fbWidth,
-      height: fbHeight,
-    };
-  } else {
-    // Use size of context canvas for now
-    canvas = {
-      width: gl.canvas.width,
-      height: gl.canvas.height,
-    };
+  // Return methods emulating some of the behavior of CanvasRenderingContext2D
+  return {
+    canvas: gl.canvas,
+    drawImage: renderer.drawImage,
+    clearRect: renderer.clearRect,
+  };
+}
+
+function canvas2dWrappingFramebuffer(gl, framebuffer, fbWidth, fbHeight) {
+  // Make sure we have a valid framebuffer
+  if ( !(framebuffer instanceof WebGLFramebuffer) ) {
+    console.log("sim2d ERROR: no valid framebuffer supplied!");
+    return false;
   }
 
+  // Store width and height of framebuffer in an updateable canvas property
+  const fbSize = {
+    width: fbWidth || gl.canvas.width,
+    height: fbHeight || gl.canvas.height,
+  };
+
   // Initialize renderer (returns methods drawImage, clearRect)
-  const render = initRenderer(gl, canvas);
+  const render = initRenderer(gl, fbSize);
 
   return {
-    canvas,
+    canvas: fbSize,
     drawImage,
     clearRect,
   };
 
+  // Wrap render functions with framebuffer bindings
   function drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight) {
-    // If we are rendering to a framebuffer, bind it first
-    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
-    // Pass on the call.  TODO: this is messy
+    // TODO: duplicated parameter list is messy
     render.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
 
-    // Rebind the default canvas buffer
-    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return;
   }
 
   function clearRect(x, y, width, height) {
-    // If we are rendering to a framebuffer, bind it first
-    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
-    // Pass on the call to the renderer. TODO: this is messy
+    // TODO: duplicated parameter list is messy
     render.clearRect(x, y, width, height);
 
-    // Rebind the default canvas buffer
-    if (haveFB) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return;
   }
 }
 
-export { initSim2d };
+export { canvas2dFromWebgl, canvas2dWrappingFramebuffer };

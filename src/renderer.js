@@ -3,7 +3,8 @@ import { quadShaders as shaderSrc } from "./shaders/quadShaders.js";
 
 export function initRenderer(gl, fbSize) {
   // Input gl is a WebGL rendering context
-  // Input fbSize is an object with properties width, height
+  // Input fbSize is an object with properties width, height indicating the
+  //   pixel size of the framebuffer to which we are rendering
 
   // Initialize shader program
   const progInfo = yawgl.initShaderProgram(gl, shaderSrc.vert, shaderSrc.frag);

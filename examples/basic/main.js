@@ -15,7 +15,7 @@ export function main() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
   // Create simulated 2d canvas as wrapper on WebGL context
-  const ctx2d = sim2d.initSim2d(display);
+  const ctx2d = sim2d.canvas2dFromWebgl(display);
   // Get overlay canvas for drawing bounding boxes
   const overlay = document.getElementById("vectorCanvas").getContext("2d");
 
